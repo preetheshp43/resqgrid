@@ -9,3 +9,4 @@ font = "monospace"
 headless = true
 enableCORS = false
 enableXsrfProtection = false
+
