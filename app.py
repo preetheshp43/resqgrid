@@ -2,181 +2,237 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import pydeck as pdk
-import folium
-from streamlit_folium import st_folium
 import streamlit.components.v1 as components
-from PIL import Image, ImageDraw, ImageEnhance
+from PIL import Image, ImageDraw
 import datetime
 import time
 import math
+import random
 
 # ==============================================================================
-# 1. APPLICATION CONFIGURATION & CLEAN PROFESSIONAL THEME
+# 1. PAGE SETUP & CYBER-WAR-ROOM THEME
 # ==============================================================================
 st.set_page_config(
-    page_title="RESQGRID — Autonomous Disaster Intelligence",
+    page_title="RESQGRID // TACTICAL CRISIS WAR ROOM",
     page_icon="⚡",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded"
 )
 
-# Professional Minimalist CSS Theme (Palantir / SpaceX Command Aesthetic)
+# Custom High-End Cyberpunk / Palantir Command HUD Styles
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=JetBrains+Mono:wght@400;600;800&display=swap');
     
     .stApp {
-        background-color: #080d1a;
+        background: radial-gradient(circle at 50% 10%, #0c162d 0%, #060a14 70%, #02040a 100%);
         color: #e2e8f0;
-        font-family: 'Inter', system-ui, sans-serif;
+        font-family: 'JetBrains Mono', monospace;
     }
-    
-    /* Top Bar Branding */
-    .top-brand {
+
+    /* Top HUD Header */
+    .hud-header {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 12px 20px;
-        background: rgba(13, 21, 39, 0.7);
-        border: 1px solid rgba(0, 240, 255, 0.15);
+        padding: 14px 24px;
+        background: rgba(10, 20, 42, 0.7);
+        border: 1px solid rgba(0, 240, 255, 0.3);
         border-radius: 14px;
+        box-shadow: 0 0 30px rgba(0, 240, 255, 0.15), inset 0 0 15px rgba(0, 240, 255, 0.05);
+        backdrop-filter: blur(20px);
         margin-bottom: 20px;
-        backdrop-filter: blur(16px);
+    }
+    
+    .hud-title {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 20px;
+        font-weight: 900;
+        letter-spacing: 2px;
+        color: #fff;
+        text-shadow: 0 0 10px rgba(0, 240, 255, 0.8);
     }
     
     /* Metrics */
     div[data-testid="stMetric"] {
-        background: rgba(13, 21, 39, 0.6);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        padding: 14px 18px;
+        background: rgba(12, 22, 45, 0.8);
+        border: 1px solid rgba(0, 240, 255, 0.25);
+        padding: 14px 20px;
         border-radius: 12px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), inset 0 0 10px rgba(0, 240, 255, 0.05);
     }
     div[data-testid="stMetricValue"] {
         color: #00f0ff !important;
-        font-weight: 700;
-        font-size: 28px !important;
-        font-family: 'JetBrains Mono', monospace;
+        font-weight: 800;
+        font-size: 32px !important;
+        font-family: 'Orbitron', monospace;
+        text-shadow: 0 0 15px rgba(0, 240, 255, 0.6);
     }
     div[data-testid="stMetricLabel"] {
         color: #94a3b8 !important;
         font-size: 11px !important;
         text-transform: uppercase;
-        letter-spacing: 0.8px;
-        font-weight: 600;
+        letter-spacing: 1.5px;
+        font-weight: bold;
+    }
+
+    /* Custom Tactical Cards */
+    .crisis-card {
+        background: linear-gradient(135deg, rgba(16, 28, 58, 0.7) 0%, rgba(8, 14, 28, 0.9) 100%);
+        border: 1px solid rgba(0, 240, 255, 0.2);
+        border-left: 4px solid #ef4444;
+        border-radius: 10px;
+        padding: 16px;
+        margin-bottom: 14px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+        transition: all 0.2s ease;
+    }
+    .crisis-card:hover {
+        border-color: rgba(0, 240, 255, 0.6);
+        box-shadow: 0 0 25px rgba(0, 240, 255, 0.25);
+        transform: translateY(-2px);
+    }
+    
+    .status-pill-p1 {
+        background: rgba(239, 68, 68, 0.2);
+        color: #ef4444;
+        border: 1px solid #ef4444;
+        padding: 3px 10px;
+        border-radius: 20px;
+        font-size: 10px;
+        font-weight: bold;
+        letter-spacing: 1px;
+        animation: pulse 1.5s infinite;
+    }
+    
+    .status-pill-dispatched {
+        background: rgba(16, 185, 129, 0.2);
+        color: #10b981;
+        border: 1px solid #10b981;
+        padding: 3px 10px;
+        border-radius: 20px;
+        font-size: 10px;
+        font-weight: bold;
+        letter-spacing: 1px;
     }
     
     /* Buttons */
     .stButton>button {
-        background: linear-gradient(135deg, #00f0ff 0%, #0088ff 100%);
-        color: #050811;
-        font-weight: 700;
+        background: linear-gradient(90deg, #00f0ff 0%, #0077ff 100%);
+        color: #030712;
+        font-family: 'Orbitron', sans-serif;
+        font-weight: 800;
         border: none;
         border-radius: 8px;
-        padding: 8px 16px;
+        padding: 10px 20px;
         font-size: 12px;
+        letter-spacing: 1px;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
-        font-family: 'JetBrains Mono', monospace;
+        box-shadow: 0 0 20px rgba(0, 240, 255, 0.4);
         transition: all 0.2s ease;
     }
     .stButton>button:hover {
-        box-shadow: 0 0 16px rgba(0, 240, 255, 0.45);
+        box-shadow: 0 0 30px rgba(0, 240, 255, 0.8);
+        transform: scale(1.02);
         color: #000;
-        transform: translateY(-1px);
-    }
-    
-    /* Status Badges */
-    .badge-critical {
-        background: rgba(239, 68, 68, 0.15);
-        color: #ef4444;
-        border: 1px solid rgba(239, 68, 68, 0.4);
-        padding: 3px 8px;
-        border-radius: 6px;
-        font-size: 10px;
-        font-weight: 700;
-        font-family: 'JetBrains Mono', monospace;
-    }
-    .badge-high {
-        background: rgba(245, 158, 11, 0.15);
-        color: #f59e0b;
-        border: 1px solid rgba(245, 158, 11, 0.4);
-        padding: 3px 8px;
-        border-radius: 6px;
-        font-size: 10px;
-        font-weight: 700;
-        font-family: 'JetBrains Mono', monospace;
-    }
-    .badge-moderate {
-        background: rgba(0, 240, 255, 0.15);
-        color: #00f0ff;
-        border: 1px solid rgba(0, 240, 255, 0.4);
-        padding: 3px 8px;
-        border-radius: 6px;
-        font-size: 10px;
-        font-weight: 700;
-        font-family: 'JetBrains Mono', monospace;
-    }
-    .badge-dispatched {
-        background: rgba(16, 185, 129, 0.15);
-        color: #10b981;
-        border: 1px solid rgba(16, 185, 129, 0.4);
-        padding: 3px 8px;
-        border-radius: 6px;
-        font-size: 10px;
-        font-weight: 700;
-        font-family: 'JetBrains Mono', monospace;
-    }
-
-    /* Cards */
-    .incident-card {
-        background: rgba(17, 26, 46, 0.5);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 12px;
-        padding: 16px;
-        margin-bottom: 12px;
-        transition: border 0.2s ease;
-    }
-    .incident-card:hover {
-        border-color: rgba(0, 240, 255, 0.35);
     }
 </style>
 """, unsafe_allow_html=True)
 
 
 # ==============================================================================
-# 2. AUDIO & 3D INTERACTIVE HERO COMPONENT
+# 2. AUDIO SYNTHESIZER & TACTICAL SFX
 # ==============================================================================
-def render_tactical_hero_3d():
-    """Renders interactive 3D WebGL Holographic Earth & UAV Radar Canvas."""
-    hero_code = """
+def trigger_sfx(sound_name):
+    """Generates realistic synthetic tactical radio / siren sound effects in the browser."""
+    sound_js = {
+        "siren": """
+            var osc1 = ctx.createOscillator();
+            var osc2 = ctx.createOscillator();
+            var gain = ctx.createGain();
+            osc1.type = 'sawtooth'; osc2.type = 'square';
+            osc1.frequency.setValueAtTime(550, now);
+            osc1.frequency.exponentialRampToValueAtTime(880, now + 0.25);
+            osc1.frequency.exponentialRampToValueAtTime(550, now + 0.5);
+            osc2.frequency.setValueAtTime(554, now);
+            osc2.frequency.exponentialRampToValueAtTime(884, now + 0.25);
+            osc2.frequency.exponentialRampToValueAtTime(554, now + 0.5);
+            gain.gain.setValueAtTime(0.12, now);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.55);
+            osc1.connect(gain); osc2.connect(gain); gain.connect(ctx.destination);
+            osc1.start(now); osc2.start(now); osc1.stop(now + 0.55); osc2.stop(now + 0.55);
+        """,
+        "dispatch": """
+            [440, 554.37, 659.25, 880].forEach((f, i) => {
+                var osc = ctx.createOscillator();
+                var g = ctx.createGain();
+                var t = now + i * 0.08;
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(f, t);
+                g.gain.setValueAtTime(0.1, t);
+                g.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+                osc.connect(g); g.connect(ctx.destination);
+                osc.start(t); osc.stop(t + 0.25);
+            });
+        """,
+        "ping": """
+            var osc = ctx.createOscillator();
+            var g = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(1400, now);
+            osc.frequency.exponentialRampToValueAtTime(2200, now + 0.1);
+            g.gain.setValueAtTime(0.08, now);
+            g.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+            osc.connect(g); g.connect(ctx.destination);
+            osc.start(now); osc.stop(now + 0.12);
+        """
+    }
+    action_code = sound_js.get(sound_name, sound_js["ping"])
+    components.html(f"""
+    <script>
+    try {{
+        var AudioContext = window.AudioContext || window.webkitAudioContext;
+        var ctx = new AudioContext();
+        var now = ctx.currentTime;
+        {action_code}
+    }} catch(e) {{}}
+    </script>
+    """, height=0, width=0)
+
+
+# ==============================================================================
+# 3. INTERACTIVE 3D HOLOGRAPHIC RADAR CANVAS (THREE.JS)
+# ==============================================================================
+def render_cinematic_3d_radar():
+    """Renders a fully interactive holographic 3D globe with real-time orbiting UAVs and shockwave pings."""
+    components.html("""
     <!DOCTYPE html>
     <html>
     <head>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
         <style>
-            body, html { margin: 0; padding: 0; overflow: hidden; background: #080d1a; width: 100%; height: 100%; font-family: monospace; }
-            #container { width: 100%; height: 260px; position: relative; }
-            .telemetry-label { position: absolute; top: 10px; left: 14px; color: #00f0ff; font-size: 11px; font-weight: bold; background: rgba(8,13,26,0.8); padding: 4px 10px; border: 1px solid rgba(0,240,255,0.3); border-radius: 6px; pointer-events: none; }
-            .hint-label { position: absolute; bottom: 10px; right: 14px; color: #64748b; font-size: 10px; background: rgba(8,13,26,0.8); padding: 3px 8px; border-radius: 4px; pointer-events: none; }
+            body, html { margin:0; padding:0; overflow:hidden; background:#060a14; width:100%; height:100%; font-family:monospace; }
+            #radar-view { width:100%; height:280px; position:relative; }
+            .badge-hud { position:absolute; top:12px; left:16px; color:#00f0ff; font-size:11px; font-weight:bold; background:rgba(6,10,20,0.8); padding:5px 12px; border:1px solid rgba(0,240,255,0.4); border-radius:6px; box-shadow:0 0 10px rgba(0,240,255,0.3); pointer-events:none; }
+            .grid-coords { position:absolute; bottom:12px; right:16px; color:#64748b; font-size:10px; background:rgba(6,10,20,0.8); padding:4px 10px; border-radius:4px; pointer-events:none; }
         </style>
     </head>
     <body>
-        <div id="container">
-            <div class="telemetry-label">
-                <span style="color:#ef4444; animation: blink 1s infinite;">●</span> SATELLITE DISASTER GRID: ONLINE
+        <div id="radar-view">
+            <div class="badge-hud">
+                <span style="color:#ef4444; animation: blink 1s infinite;">●</span> SATELLITE MESH: 32 NODES SYNCED // LIVE TELEMETRY
             </div>
-            <div class="hint-label">DRAG TO ROTATE 3D TACTICAL PROJECTION</div>
+            <div class="grid-coords">DRAG TO ORBIT TACTICAL PROJECTION // SCROLL TO ZOOM</div>
         </div>
         <script>
-            const container = document.getElementById('container');
+            const container = document.getElementById('radar-view');
             const w = container.clientWidth || window.innerWidth;
-            const h = 260;
+            const h = 280;
 
             const scene = new THREE.Scene();
-            scene.fog = new THREE.FogExp2(0x080d1a, 0.04);
+            scene.fog = new THREE.FogExp2(0x060a14, 0.035);
             const camera = new THREE.PerspectiveCamera(40, w / h, 0.1, 1000);
-            camera.position.set(0, 0.8, 6.2);
+            camera.position.set(0, 1.2, 6.5);
 
             const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setSize(w, h);
@@ -184,101 +240,101 @@ def render_tactical_hero_3d():
             container.appendChild(renderer.domElement);
 
             scene.add(new THREE.AmbientLight(0x00f0ff, 0.8));
-            const light = new THREE.DirectionalLight(0xffffff, 1.8);
-            light.position.set(4, 6, 4);
-            scene.add(light);
+            const sun = new THREE.DirectionalLight(0xffffff, 2.0);
+            sun.position.set(5, 8, 5);
+            scene.add(sun);
 
             const globe = new THREE.Group();
             scene.add(globe);
 
-            // Digital Globe Wireframe
-            const sphere = new THREE.Mesh(
-                new THREE.SphereGeometry(2.1, 28, 28),
-                new THREE.MeshBasicMaterial({ color: 0x005577, wireframe: true, transparent: true, opacity: 0.25 })
+            // Wireframe Cyber Globe
+            const earthMesh = new THREE.Mesh(
+                new THREE.SphereGeometry(2.2, 32, 32),
+                new THREE.MeshBasicMaterial({ color: 0x007799, wireframe: true, transparent: true, opacity: 0.3 })
             );
-            globe.add(sphere);
+            globe.add(earthMesh);
 
-            // Dark Inner Sphere
+            // Dark inner core with glowing aura
             globe.add(new THREE.Mesh(
-                new THREE.SphereGeometry(2.06, 24, 24),
-                new THREE.MeshBasicMaterial({ color: 0x0a1426, transparent: true, opacity: 0.85 })
+                new THREE.SphereGeometry(2.15, 26, 26),
+                new THREE.MeshBasicMaterial({ color: 0x091428, transparent: true, opacity: 0.85 })
             ));
 
-            // Orbital Rings
+            // Concentric Radar Scan Rings
             const ring1 = new THREE.Mesh(
-                new THREE.RingGeometry(2.5, 2.53, 48),
-                new THREE.MeshBasicMaterial({ color: 0x00f0ff, side: THREE.DoubleSide, transparent: true, opacity: 0.4 })
+                new THREE.RingGeometry(2.6, 2.63, 64),
+                new THREE.MeshBasicMaterial({ color: 0x00f0ff, side: THREE.DoubleSide, transparent: true, opacity: 0.45 })
             );
             ring1.rotation.x = Math.PI / 2.3;
             globe.add(ring1);
 
             const ring2 = new THREE.Mesh(
-                new THREE.RingGeometry(2.8, 2.82, 48),
-                new THREE.MeshBasicMaterial({ color: 0xef4444, side: THREE.DoubleSide, transparent: true, opacity: 0.3 })
+                new THREE.RingGeometry(2.9, 2.93, 64),
+                new THREE.MeshBasicMaterial({ color: 0xef4444, side: THREE.DoubleSide, transparent: true, opacity: 0.35 })
             );
-            ring2.rotation.x = Math.PI / 1.8;
+            ring2.rotation.x = Math.PI / 1.7;
             ring2.rotation.y = -0.3;
             globe.add(ring2);
 
-            // Disaster Beacons
-            const beacons = [
-                { lat: 12.8, lon: 74.8, c: 0xef4444 },
+            // Disaster Beacons with Expanding Waves
+            const coords = [
+                { lat: 12.8, lon: 74.8, c: 0xef4444 }, // Flash flood
                 { lat: 25.0, lon: 45.0, c: 0xf59e0b },
                 { lat: -15.0, lon: 120.0, c: 0x00f0ff },
                 { lat: 35.0, lon: -95.0, c: 0xef4444 }
             ];
             const pings = [];
-            beacons.forEach(b => {
+            coords.forEach(b => {
                 const phi = (90 - b.lat) * (Math.PI / 180);
                 const theta = (b.lon + 180) * (Math.PI / 180);
-                const x = -(2.1 * Math.sin(phi) * Math.cos(theta));
-                const z = 2.1 * Math.sin(phi) * Math.sin(theta);
-                const y = 2.1 * Math.cos(phi);
+                const x = -(2.2 * Math.sin(phi) * Math.cos(theta));
+                const z = 2.2 * Math.sin(phi) * Math.sin(theta);
+                const y = 2.2 * Math.cos(phi);
 
-                const pt = new THREE.Mesh(new THREE.SphereGeometry(0.07, 12, 12), new THREE.MeshBasicMaterial({ color: b.c }));
-                pt.position.set(x, y, z);
-                globe.add(pt);
+                const pin = new THREE.Mesh(new THREE.SphereGeometry(0.08, 12, 12), new THREE.MeshBasicMaterial({ color: b.c }));
+                pin.position.set(x, y, z);
+                globe.add(pin);
 
-                const ping = new THREE.Mesh(new THREE.RingGeometry(0.09, 0.14, 16), new THREE.MeshBasicMaterial({ color: b.c, side: THREE.DoubleSide, transparent: true, opacity: 0.9 }));
-                ping.position.set(x * 1.01, y * 1.01, z * 1.01);
-                ping.lookAt(x * 2, y * 2, z * 2);
-                globe.add(ping);
-                pings.push(ping);
+                const ring = new THREE.Mesh(new THREE.RingGeometry(0.1, 0.16, 20), new THREE.MeshBasicMaterial({ color: b.c, side: THREE.DoubleSide, transparent: true, opacity: 0.9 }));
+                ring.position.set(x * 1.01, y * 1.01, z * 1.01);
+                ring.lookAt(x * 2, y * 2, z * 2);
+                globe.add(ring);
+                pings.push(ring);
             });
 
-            // Orbiting Recon Drone with Radar Cone
+            // Reconnaissance Drone with Sensor Cone
             const drone = new THREE.Group();
-            drone.add(new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.04, 0.25), new THREE.MeshBasicMaterial({ color: 0x00f0ff })));
-            const cone = new THREE.Mesh(new THREE.ConeGeometry(0.5, 1.2, 14, 1, true), new THREE.MeshBasicMaterial({ color: 0x00f0ff, wireframe: true, transparent: true, opacity: 0.2 }));
+            drone.add(new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.05, 0.35), new THREE.MeshBasicMaterial({ color: 0x00f0ff })));
+            const cone = new THREE.Mesh(new THREE.ConeGeometry(0.6, 1.4, 16, 1, true), new THREE.MeshBasicMaterial({ color: 0x00f0ff, wireframe: true, transparent: true, opacity: 0.25 }));
             cone.rotation.x = Math.PI;
-            cone.position.y = -0.6;
+            cone.position.y = -0.7;
             drone.add(cone);
             scene.add(drone);
 
             let mouseX = 0, mouseY = 0;
             window.addEventListener('mousemove', e => {
                 mouseX = (e.clientX / window.innerWidth) * 2 - 1;
-                mouseY = -(e.clientY / 260) * 2 + 1;
+                mouseY = -(e.clientY / 280) * 2 + 1;
             });
 
             const clock = new THREE.Clock();
             function animate() {
                 requestAnimationFrame(animate);
                 const t = clock.getElapsedTime();
-                globe.rotation.y = t * 0.12 + mouseX * 0.35;
+                globe.rotation.y = t * 0.12 + mouseX * 0.4;
                 globe.rotation.x = 0.15 + mouseY * 0.2;
-                ring1.rotation.z = t * 0.18;
-                ring2.rotation.z = -t * 0.22;
+                ring1.rotation.z = t * 0.2;
+                ring2.rotation.z = -t * 0.25;
 
-                pings.forEach((p, i) => {
-                    const s = 1 + (Math.sin(t * 4 + i) + 1) * 0.55;
+                pings.forEach((p, idx) => {
+                    const s = 1 + (Math.sin(t * 4 + idx) + 1) * 0.6;
                     p.scale.set(s, s, s);
                     p.material.opacity = Math.max(0, 1 - (s - 1));
                 });
 
-                drone.position.x = Math.cos(t * 0.5) * 3.0;
-                drone.position.z = Math.sin(t * 0.5) * 3.0;
-                drone.position.y = 0.7 + Math.sin(t * 1.4) * 0.25;
+                drone.position.x = Math.cos(t * 0.5) * 3.2;
+                drone.position.z = Math.sin(t * 0.5) * 3.2;
+                drone.position.y = 0.8 + Math.sin(t * 1.4) * 0.3;
                 drone.lookAt(0, 0, 0);
 
                 renderer.render(scene, camera);
@@ -287,439 +343,391 @@ def render_tactical_hero_3d():
         </script>
     </body>
     </html>
-    """
-    components.html(hero_code, height=270, scrolling=False)
-
-
-def play_chime():
-    """Web Audio API tactical confirmation chime."""
-    components.html("""
-    <script>
-    try {
-        var ctx = new (window.AudioContext || window.webkitAudioContext)();
-        var now = ctx.currentTime;
-        [523.25, 659.25, 783.99, 1046.5].forEach((freq, idx) => {
-            var osc = ctx.createOscillator();
-            var gain = ctx.createGain();
-            var t = now + idx * 0.07;
-            osc.frequency.setValueAtTime(freq, t);
-            gain.gain.setValueAtTime(0.08, t);
-            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.start(t);
-            osc.stop(t + 0.2);
-        });
-    } catch(e) {}
-    </script>
-    """, height=0, width=0)
+    """, height=290, scrolling=False)
 
 
 # ==============================================================================
-# 3. LIVE SIMULATION STATE
+# 4. CRISIS DATA ENGINE
 # ==============================================================================
 if "incidents" not in st.session_state:
     st.session_state.incidents = [
         {
-            "id": "EMERGENCY-01",
-            "title": "Severe Flash Flood & Submerged Settlement",
-            "type": "Flood",
+            "id": "CRISIS-DELTA-1",
+            "title": "Catastrophic Flash Flood: Submerged Urban Settlement",
+            "type": "Flash Flood",
             "lat": 12.8465,
             "lng": 74.8624,
-            "location_name": "Jeppinamogaru, Netravati Basin",
+            "sector": "Jeppinamogaru River Corridor",
             "priority": "CRITICAL P1",
-            "status": "PENDING",
-            "trapped": 14,
-            "total_victims": 18,
-            "damage_score": 92,
-            "escalation": "Rapid (+0.4m/hr crest rise)",
-            "solution_summary": "Deploy NDRF Inflatable Rescue Boat + Eagle-X Recon UAV with flotation payload.",
-            "recommended_units": ["NDRF Inflatable Boat Alpha", "UAV Recon Drone Eagle-X"],
-            "eta_mins": 8.4,
-            "safe_corridor": "Bypass via Kuloor Peripheral Ring Road"
+            "status": "IMMEDIATE DISPATCH REQUIRED",
+            "trapped": 16,
+            "threat_water_rise": "+0.45 m/hr",
+            "time_to_crest": "28 Mins",
+            "damage_pct": 94,
+            "ai_action": "Deploy NDRF Inflatable Gemini Alpha + Drone Recon Eagle-X (drop acoustic vests).",
+            "units_needed": ["NDRF Gemini Boat Alpha", "Eagle-X Recon Drone"]
         },
         {
-            "id": "EMERGENCY-02",
-            "title": "Chemical Fire & Toxic Vapor Threat",
-            "type": "Fire",
+            "id": "CRISIS-ALPHA-2",
+            "title": "Industrial Toxic Hydrocarbon Explosion & Fire Plume",
+            "type": "Chemical Fire",
             "lat": 12.9512,
             "lng": 74.8021,
-            "location_name": "Baikampady Industrial Estate",
+            "sector": "Baikampady Petrochemical Block",
             "priority": "CRITICAL P1",
-            "status": "PENDING",
-            "trapped": 5,
-            "total_victims": 8,
-            "damage_score": 88,
-            "escalation": "High (plume spreading at 34 km/h)",
-            "solution_summary": "Deploy Heavy Foam Tender FT-07 with AFFF + Hazmat Ambulance Squad.",
-            "recommended_units": ["Heavy Foam Tender FT-07", "Rapid Paramedic Unit 02"],
-            "eta_mins": 11.2,
-            "safe_corridor": "Direct Northern Highway Corridor"
+            "status": "IMMEDIATE DISPATCH REQUIRED",
+            "trapped": 6,
+            "threat_water_rise": "Plume 36 km/h NNE",
+            "time_to_crest": "18 Mins",
+            "damage_pct": 89,
+            "ai_action": "Deploy Heavy Foam Tender FT-07 (AFFF) + Hazmat Decontamination Van.",
+            "units_needed": ["Heavy Foam Tender FT-07", "Hazmat Trauma Unit"]
         },
         {
-            "id": "EMERGENCY-03",
-            "title": "Ghat Landslide & Road Blockade",
+            "id": "CRISIS-ECHO-3",
+            "title": "Ghat Slope Failure & Highway Bus Trapped",
             "type": "Landslide",
             "lat": 12.9056,
             "lng": 74.9124,
-            "location_name": "Gurupura Ghat Corridor",
+            "sector": "Gurupura Mountain Pass",
             "priority": "ELEVATED P2",
-            "status": "DISPATCHED",
-            "trapped": 3,
-            "total_victims": 7,
-            "damage_score": 68,
-            "escalation": "Moderate",
-            "solution_summary": "Deploy SDRF Rescue Squad with hydraulic spreaders via Kaikamba link.",
-            "recommended_units": ["SDRF Rescue Squad 3", "ALS Mobile Trauma Unit 01"],
-            "eta_mins": 14.0,
-            "safe_corridor": "Kaikamba Bypass Link"
-        },
-        {
-            "id": "EMERGENCY-04",
-            "title": "Commercial Building Structural Failure",
-            "type": "Collapse",
-            "lat": 12.8682,
-            "lng": 74.8385,
-            "location_name": "Bunder Old Port Complex",
-            "priority": "ELEVATED P2",
-            "status": "DISPATCHED",
-            "trapped": 2,
-            "total_victims": 11,
-            "damage_score": 62,
-            "escalation": "Stable",
-            "solution_summary": "Deploy acoustic search probe and rapid foundation shoring crew.",
-            "recommended_units": ["ALS Mobile Trauma Unit 01"],
-            "eta_mins": 9.5,
-            "safe_corridor": "Port Link Road"
+            "status": "UNITS EN ROUTE",
+            "trapped": 4,
+            "threat_water_rise": "Secondary Slump 72%",
+            "time_to_crest": "45 Mins",
+            "damage_pct": 74,
+            "ai_action": "Heavy hydraulic cutters + SDRF Mountain Rescue Squad.",
+            "units_needed": ["SDRF Rescue Squad 3"]
         }
     ]
 
 if "fleet" not in st.session_state:
     st.session_state.fleet = [
-        {"id": "UNIT-01", "name": "NDRF Inflatable Boat Alpha", "type": "Watercraft", "status": "AVAILABLE", "battery": 94, "capacity": 12, "crew": 5, "assigned_to": None},
-        {"id": "UNIT-02", "name": "UAV Recon Drone Eagle-X", "type": "Drone", "status": "AVAILABLE", "battery": 88, "capacity": 2, "crew": 2, "assigned_to": None},
-        {"id": "UNIT-03", "name": "Heavy Foam Tender FT-07", "type": "Fire", "status": "AVAILABLE", "battery": 92, "capacity": 6, "crew": 6, "assigned_to": None},
-        {"id": "UNIT-04", "name": "ALS Mobile Trauma Unit 01", "type": "Ambulance", "status": "EN ROUTE", "battery": 78, "capacity": 3, "crew": 4, "assigned_to": "EMERGENCY-03"},
-        {"id": "UNIT-05", "name": "Rapid Paramedic Unit 02", "type": "Ambulance", "status": "AVAILABLE", "battery": 86, "capacity": 2, "crew": 3, "assigned_to": None},
-        {"id": "UNIT-06", "name": "SDRF Rescue Squad 3", "type": "Heavy Rescue", "status": "ON SCENE", "battery": 74, "capacity": 10, "crew": 8, "assigned_to": "EMERGENCY-03"}
+        {"id": "RESCUE-01", "name": "NDRF Gemini Boat Alpha", "type": "Inflatable Watercraft", "status": "AVAILABLE", "crew": 6, "capacity": 12, "battery": 96},
+        {"id": "RESCUE-02", "name": "Eagle-X Recon Drone", "type": "FLIR Thermal UAV", "status": "AVAILABLE", "crew": 2, "capacity": 2, "battery": 89},
+        {"id": "RESCUE-03", "name": "Heavy Foam Tender FT-07", "type": "Fire Suppression", "status": "AVAILABLE", "crew": 6, "capacity": 4, "battery": 92},
+        {"id": "RESCUE-04", "name": "Hazmat Trauma Unit", "type": "Advanced Life Support", "status": "AVAILABLE", "crew": 4, "capacity": 3, "battery": 85},
+        {"id": "RESCUE-05", "name": "SDRF Rescue Squad 3", "type": "Heavy Shoring", "status": "EN ROUTE", "crew": 8, "capacity": 8, "battery": 78}
     ]
 
-if "saved_victims" not in st.session_state:
-    st.session_state.saved_victims = 24
+if "survivors_extracted" not in st.session_state:
+    st.session_state.survivors_extracted = 38
 
 
 # ==============================================================================
-# 4. TOP BRANDING & HUD METRICS
+# 5. HEADER HUD
 # ==============================================================================
 st.markdown("""
-<div class="top-brand">
-    <div style="display:flex; align-items:center; gap:12px;">
-        <span style="font-size:24px;">⚡</span>
+<div class="hud-header">
+    <div style="display:flex; align-items:center; gap:16px;">
+        <span style="font-size:28px; filter: drop-shadow(0 0 10px #00f0ff);">🚨</span>
         <div>
-            <div style="font-size:16px; font-weight:800; letter-spacing:1px; color:#fff; font-family:'JetBrains Mono', monospace;">
-                RESQ<span style="color:#00f0ff;">GRID</span> <span style="font-size:11px; color:#94a3b8; font-weight:normal;">v2.5 OPERATIONS</span>
-            </div>
-            <div style="font-size:11px; color:#64748b;">Autonomous Disaster Response Intelligence & Fleet Optimization</div>
+            <div class="hud-title">RESQGRID <span style="color:#00f0ff;">WAR ROOM</span></div>
+            <div style="font-size:11px; color:#64748b;">AUTONOMOUS INCIDENT DISPATCH & COMBINATORIAL RESOURCE RESCUE MESH</div>
         </div>
     </div>
-    <div style="display:flex; align-items:center; gap:10px;">
-        <span class="badge-critical">DEFCON 2 : CRISIS ACTIVE</span>
-        <span style="font-size:11px; font-family:'JetBrains Mono', monospace; color:#94a3b8;">SECTOR: COASTAL HUB</span>
+    <div style="display:flex; align-items:center; gap:12px;">
+        <span class="status-pill-p1">DEFCON 1: MAXIMUM ALERT</span>
+        <span style="color:#00f0ff; font-weight:bold; font-size:12px;">SYSTEM INTEGRITY: 100%</span>
     </div>
 </div>
 """, unsafe_allow_html=True)
 
-# 3D Interactive Hero Projection
-render_tactical_hero_3d()
+# 3D Interactive WebGL Scene
+render_cinematic_3d_radar()
 
-# Quick Key Numbers
-active_incidents = [i for i in st.session_state.incidents if i["status"] != "RESOLVED"]
-critical_count = len([i for i in active_incidents if "CRITICAL" in i["priority"]])
-trapped_lives = sum(i["trapped"] for i in active_incidents)
-deployed_count = len([f for f in st.session_state.fleet if f["status"] in ["EN ROUTE", "ON SCENE"]])
+# Live Mission Counters
+open_incidents = [i for i in st.session_state.incidents if i["status"] != "RESOLVED"]
+trapped_lives = sum(i["trapped"] for i in open_incidents)
+units_deployed = len([f for f in st.session_state.fleet if f["status"] in ["EN ROUTE", "ON SCENE"]])
 
-m1, m2, m3, m4 = st.columns(4)
-m1.metric("Active Disaster Zones", f"{len(active_incidents)} Sectors")
-m2.metric("Critical P1 Emergencies", f"{critical_count}", delta="Requires Dispatch", delta_color="inverse")
-m3.metric("Lives in Jeopardy", f"{trapped_lives} Trapped", delta="Window < 35m", delta_color="inverse")
-m4.metric("Deployed Rescue Fleet", f"{deployed_count} / {len(st.session_state.fleet)} Units", delta="Active")
+m1, m2, m3, m4, m5 = st.columns(5)
+m1.metric("Critical Sectors", f"{len(open_incidents)} Active")
+m2.metric("Lives in Direct Peril", f"{trapped_lives} Trapped", delta="Critical", delta_color="inverse")
+m3.metric("Fleet Deployed", f"{units_deployed} / {len(st.session_state.fleet)} Units", delta="Active")
+m4.metric("Survivors Rescued", f"{st.session_state.survivors_extracted} Saved", delta="+4 this turn")
+m5.metric("Decision Latency", "0.85s", delta="Real-time")
 
-st.markdown("<div style='height:16px;'></div>", unsafe_allow_html=True)
+st.markdown("<div style='height:14px;'></div>", unsafe_allow_html=True)
 
 
 # ==============================================================================
-# 5. NAVIGATION TABS (CLEAN & PROFESSIONAL)
+# 6. ACTION-PACKED TABS
 # ==============================================================================
-tab_triage, tab_intake, tab_fleet, tab_routes = st.tabs([
-    "🗺️ Operational Map & AI Triage",
-    "📸 Report Emergency (AI Vision)",
-    "🚒 Rescue Fleet & Auto-Optimizer",
-    "🛣️ Safe Hazard Corridors"
+tab_ops, tab_drone, tab_sim, tab_fleet = st.tabs([
+    "⚡ Live Crisis Response & Triage",
+    "🛸 FLIR Thermal Drone Recon Cockpit",
+    "🌊 Environmental Surge Simulator",
+    "🚒 Fleet Readiness & Dispatch Matrix"
 ])
 
 
 # ==============================================================================
-# TAB 1: OPERATIONAL MAP & LIVE TRIAGE
+# TAB 1: LIVE CRISIS RESPONSE & TRIAGE
 # ==============================================================================
-with tab_triage:
-    col_map, col_list = st.columns([7, 5])
+with tab_ops:
+    col_map, col_actions = st.columns([7, 5])
 
     with col_map:
-        st.markdown("#### 🛰️ Live GIS Situational Map")
+        st.markdown("##### 🗺️ 3D Battleground Elevation Map")
         
-        # Build clean PyDeck 3D visualization
-        map_points = []
-        for inc in active_incidents:
-            is_crit = "CRITICAL" in inc["priority"]
-            map_points.append({
+        # PyDeck 3D Layer
+        pts = []
+        for inc in open_incidents:
+            pts.append({
                 "title": inc["title"],
-                "type": inc["type"],
                 "lat": inc["lat"],
                 "lng": inc["lng"],
-                "severity": inc["damage_score"],
-                "color": [239, 68, 68] if is_crit else [245, 158, 11],
-                "radius": inc["trapped"] * 50 + 150
+                "elevation": inc["damage_pct"] * 35,
+                "color": [239, 68, 68, 220] if "CRITICAL" in inc["priority"] else [245, 158, 11, 220],
+                "radius": inc["trapped"] * 60 + 180
             })
-        
-        view_state = pdk.ViewState(latitude=12.8950, longitude=74.8500, zoom=11.2, pitch=40, bearing=0)
-        
-        col_layer = pdk.Layer(
+
+        view = pdk.ViewState(latitude=12.8950, longitude=74.8500, zoom=11.3, pitch=45, bearing=-10)
+
+        cols_3d = pdk.Layer(
             "ColumnLayer",
-            data=pd.DataFrame(map_points),
+            data=pd.DataFrame(pts),
             get_position=["lng", "lat"],
-            get_elevation="severity",
-            elevation_scale=40,
-            radius=200,
+            get_elevation="elevation",
+            elevation_scale=1,
+            radius=220,
             get_fill_color="color",
             pickable=True,
             auto_highlight=True
         )
 
-        scatter_layer = pdk.Layer(
+        rings = pdk.Layer(
             "ScatterplotLayer",
-            data=pd.DataFrame(map_points),
+            data=pd.DataFrame(pts),
             get_position=["lng", "lat"],
             get_color="color",
             get_radius="radius",
-            opacity=0.7,
+            opacity=0.6,
             pickable=True,
             filled=True
         )
 
         st.pydeck_chart(pdk.Deck(
-            layers=[col_layer, scatter_layer],
-            initial_view_state=view_state,
+            layers=[cols_3d, rings],
+            initial_view_state=view,
             map_style="mapbox://styles/mapbox/dark-v11",
-            tooltip={"text": "{title} ({type})\nDamage Index: {severity}%"}
+            tooltip={"text": "🚨 {title}\nDamage: {elevation}"}
         ), use_container_width=True)
 
-    with col_list:
-        st.markdown("#### ⚡ Active Emergencies & AI Solutions")
+        # Quick Disaster Trigger Buttons to play with
+        st.markdown("###### 💥 SIMULATE SUDDEN CRISIS TRIGGER:")
+        sc1, sc2, sc3 = st.columns(3)
+        with sc1:
+            if st.button("🌊 TRIGGER FLASH FLOOD", use_container_width=True):
+                new_id = f"CRISIS-DELTA-{len(st.session_state.incidents) + 1}"
+                st.session_state.incidents.insert(0, {
+                    "id": new_id,
+                    "title": "Severe Coastal Inundation: Sea Dike Breach",
+                    "type": "Flash Flood",
+                    "lat": 12.8120,
+                    "lng": 74.8450,
+                    "sector": "Someshwar Coastal Colony",
+                    "priority": "CRITICAL P1",
+                    "status": "IMMEDIATE DISPATCH REQUIRED",
+                    "trapped": 12,
+                    "threat_water_rise": "+0.60 m/hr",
+                    "time_to_crest": "15 Mins",
+                    "damage_pct": 96,
+                    "ai_action": "Deploy NDRF Gemini Boat Alpha + Airborne Supply Drops.",
+                    "units_needed": ["NDRF Gemini Boat Alpha"]
+                })
+                trigger_sfx("siren")
+                st.rerun()
 
-        for inc in active_incidents:
-            is_p1 = "CRITICAL" in inc["priority"]
-            is_dispatched = inc["status"] == "DISPATCHED"
-            badge = '<span class="badge-critical">CRITICAL P1</span>' if is_p1 else '<span class="badge-high">ELEVATED P2</span>'
-            status_badge = '<span class="badge-dispatched">DISPATCHED</span>' if is_dispatched else '<span style="color:#94a3b8; font-size:10px; font-weight:bold;">PENDING APPROVAL</span>'
+        with sc2:
+            if st.button("🔥 TRIGGER WILDFIRE FLARE", use_container_width=True):
+                st.session_state.incidents.insert(0, {
+                    "id": f"CRISIS-FIRE-{len(st.session_state.incidents) + 1}",
+                    "title": "LPG Bottling Plant Thermal Flare",
+                    "type": "Fire",
+                    "lat": 12.9300,
+                    "lng": 74.8200,
+                    "sector": "Baikampady Sector 3",
+                    "priority": "CRITICAL P1",
+                    "status": "IMMEDIATE DISPATCH REQUIRED",
+                    "trapped": 8,
+                    "threat_water_rise": "Blast Perimeter 250m",
+                    "time_to_crest": "12 Mins",
+                    "damage_pct": 91,
+                    "ai_action": "Foam Cannon perimeter containment + Hazmat Squad.",
+                    "units_needed": ["Heavy Foam Tender FT-07"]
+                })
+                trigger_sfx("siren")
+                st.rerun()
 
+        with sc3:
+            if st.button("⚡ AUTO-OPTIMIZE ENTIRE FLEET", use_container_width=True):
+                for inc in st.session_state.incidents:
+                    if inc["status"] != "RESOLVED":
+                        inc["status"] = "UNITS EN ROUTE"
+                for f in st.session_state.fleet:
+                    f["status"] = "EN ROUTE"
+                trigger_sfx("dispatch")
+                st.rerun()
+
+    with col_actions:
+        st.markdown("##### 🚨 Active Crisis Queue & One-Click Execution")
+
+        for inc in open_incidents:
+            is_dispatched = "EN ROUTE" in inc["status"]
             st.markdown(f"""
-            <div class="incident-card">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                    <span style="font-size:11px; font-weight:bold; color:#00f0ff; font-family:'JetBrains Mono', monospace;">{inc['id']}</span>
-                    <div style="display:flex; gap:6px;">{badge} {status_badge}</div>
+            <div class="crisis-card">
+                <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+                    <span style="color:#00f0ff; font-weight:bold; font-size:12px;">{inc['id']}</span>
+                    <span class="{'status-pill-dispatched' if is_dispatched else 'status-pill-p1'}">
+                        {inc['status']}
+                    </span>
                 </div>
-                <div style="font-size:14px; font-weight:700; color:#fff; margin-bottom:4px;">{inc['title']}</div>
-                <div style="font-size:11px; color:#94a3b8; margin-bottom:8px;">📍 {inc['location_name']} • Trapped: <strong style="color:#ef4444;">{inc['trapped']} lives</strong> • Escalation: {inc['escalation']}</div>
-                
-                <div style="background:rgba(8,13,26,0.6); padding:8px 12px; border-radius:8px; border:1px solid rgba(0,240,255,0.2); font-size:11px; margin-bottom:10px;">
-                    <span style="color:#00f0ff; font-weight:bold;">AI RECOMMENDED ACTION:</span><br>
-                    {inc['solution_summary']}<br>
-                    <span style="color:#10b981;">ETA: {inc['eta_mins']} mins</span> • <span style="color:#94a3b8;">Corridor: {inc['safe_corridor']}</span>
+                <div style="font-size:14px; font-weight:800; color:#fff; margin-bottom:4px;">{inc['title']}</div>
+                <div style="font-size:11px; color:#94a3b8; margin-bottom:6px;">
+                    📍 {inc['sector']} • Trapped: <strong style="color:#ef4444;">{inc['trapped']} lives</strong> • Window: <strong style="color:#f59e0b;">{inc['time_to_crest']}</strong>
+                </div>
+                <div style="background:rgba(6,10,20,0.7); border:1px solid rgba(0,240,255,0.2); padding:8px 12px; border-radius:6px; font-size:11px; margin-bottom:10px;">
+                    <strong style="color:#00f0ff;">AI RECOMMENDED MOVE:</strong><br>
+                    {inc['ai_action']}
                 </div>
             </div>
             """, unsafe_allow_html=True)
 
-            # Actions
-            col_b1, col_b2 = st.columns([1, 1])
-            with col_b1:
+            b1, b2 = st.columns([1, 1])
+            with b1:
                 if not is_dispatched:
-                    if st.button(f"⚡ DEPLOY FLEET", key=f"btn_dep_{inc['id']}", use_container_width=True):
-                        inc["status"] = "DISPATCHED"
-                        for u_name in inc["recommended_units"]:
-                            fleet_item = next((f for f in st.session_state.fleet if f["name"] == u_name), None)
-                            if fleet_item:
-                                fleet_item["status"] = "EN ROUTE"
-                                fleet_item["assigned_to"] = inc["id"]
-                        play_chime()
+                    if st.button(f"⚡ AUTHORIZE DISPATCH", key=f"disp_{inc['id']}", use_container_width=True):
+                        inc["status"] = "UNITS EN ROUTE"
+                        for u in inc["units_needed"]:
+                            match = next((f for f in st.session_state.fleet if f["name"] == u), None)
+                            if match:
+                                match["status"] = "EN ROUTE"
+                        trigger_sfx("dispatch")
                         st.rerun()
-            with col_b2:
-                if st.button(f"✅ MARK RESOLVED", key=f"btn_res_{inc['id']}", use_container_width=True):
+            with b2:
+                if st.button(f"✅ CONFIRM RESCUE", key=f"res_{inc['id']}", use_container_width=True):
                     inc["status"] = "RESOLVED"
-                    st.session_state.saved_victims += inc["trapped"]
+                    st.session_state.survivors_extracted += inc["trapped"]
                     for f in st.session_state.fleet:
-                        if f["assigned_to"] == inc["id"]:
-                            f["status"] = "AVAILABLE"
-                            f["assigned_to"] = None
-                    play_chime()
+                        f["status"] = "AVAILABLE"
+                    trigger_sfx("dispatch")
                     st.rerun()
 
 
 # ==============================================================================
-# TAB 2: AI VISION & SOS INTAKE
+# TAB 2: FLIR THERMAL DRONE RECON COCKPIT
 # ==============================================================================
-with tab_intake:
-    st.markdown("#### 📸 Multi-Modal AI Damage Assessment & SOS Ingestion")
-    st.caption("Upload ground or drone imagery to automatically identify disaster category, calculate damage %, and locate trapped survivors.")
+with tab_drone:
+    st.markdown("##### 🛸 FLIR Thermal Reconnaissance Drone Video Cockpit")
+    st.caption("Live simulated UAV Recon stream scanning sector coordinates for human thermal signatures and structural cracks.")
 
-    c_up, c_res = st.columns([6, 6])
+    col_flir, col_telemetry = st.columns([7, 5])
 
-    with c_up:
-        with st.form("sos_form"):
-            in_name = st.text_input("Emergency Scenario Title:", value="Torrential Inundation & Trapped Civilians")
-            in_cat = st.selectbox("Disaster Category:", ["Flood", "Industrial Fire", "Landslide", "Structure Collapse", "Cyclone"])
-            in_loc = st.text_input("Incident Location / Sector:", value="Ullal Coastal Settlement, Sector 4")
-            
-            c1, c2 = st.columns(2)
-            with c1:
-                in_trapped = st.number_input("Trapped Individuals:", min_value=1, value=6)
-            with c2:
-                in_total = st.number_input("Total Impacted:", min_value=1, value=14)
+    with col_flir:
+        sensor_mode = st.radio("Thermal Sensor Mode:", ["FLIR Ironbow (False Color)", "Night Vision (Phosphor Green)", "Optical 4K (Standard)"], horizontal=True)
 
-            uploaded_img = st.file_uploader("Upload Drone / Sensor Photo:", type=["jpg", "png", "jpeg"])
-            
-            submit_sos = st.form_submit_btn("⚡ RUN COMPUTER VISION & DISPATCH TO QUEUE")
-
-    with c_res:
-        st.markdown("##### 🔬 Computer Vision Object Detection")
-        
-        # Display image with bounding boxes
-        if uploaded_img:
-            base_image = Image.open(uploaded_img).convert("RGB")
+        # Generate FLIR Drone Camera Simulation
+        if "Ironbow" in sensor_mode:
+            bg_color = (25, 10, 60)
+            target_color = (255, 120, 0)
+            ambient_color = (80, 20, 110)
+        elif "Phosphor" in sensor_mode:
+            bg_color = (5, 30, 10)
+            target_color = (120, 255, 100)
+            ambient_color = (20, 80, 30)
         else:
-            # Generate synthetic inspection image
-            base_image = Image.new("RGB", (480, 260), color=(14, 25, 45))
-            d = ImageDraw.Draw(base_image)
-            d.rectangle([0, 130, 480, 260], fill=(22, 58, 104))
-            d.rectangle([90, 80, 180, 150], fill=(120, 60, 40))
-            d.polygon([(80, 80), (135, 45), (190, 80)], fill=(180, 50, 40))
-            d.rectangle([260, 90, 360, 160], fill=(90, 90, 100))
+            bg_color = (20, 30, 50)
+            target_color = (220, 60, 60)
+            ambient_color = (40, 60, 90)
 
-        annotated = base_image.copy()
-        draw = ImageDraw.Draw(annotated)
-        # Bounding box survivors
-        draw.rectangle([95, 55, 175, 95], outline=(16, 185, 129), width=3)
-        # Bounding box submerged hazard
-        draw.rectangle([10, 160, 470, 250], outline=(239, 68, 68), width=3)
+        flir_img = Image.new("RGB", (640, 340), color=bg_color)
+        d = ImageDraw.Draw(flir_img)
 
-        st.image(annotated, caption="Vision Triage: Green = Survivors Detected | Red = Severe Hazard Zone", use_container_width=True)
+        # Floodwater or terrain
+        d.rectangle([0, 160, 640, 340], fill=ambient_color)
 
+        # Submerged Structures
+        d.rectangle([120, 100, 220, 200], fill=(50, 40, 80))
+        d.polygon([(110, 100), (170, 50), (230, 100)], fill=(90, 50, 90))
+
+        d.rectangle([340, 120, 460, 220], fill=(60, 50, 90))
+        d.polygon([(330, 120), (400, 70), (470, 120)], fill=(110, 60, 100))
+
+        # Human Thermal Signatures (Heat blooms)
+        d.ellipse([145, 65, 165, 85], fill=target_color)
+        d.ellipse([170, 70, 190, 90], fill=target_color)
+        d.ellipse([185, 75, 205, 95], fill=target_color)
+
+        # Crosshair HUD
+        cx, cy = 320, 170
+        d.line([cx - 40, cy, cx + 40, cy], fill=(0, 240, 255), width=2)
+        d.line([cx, cy - 40, cx, cy + 40], fill=(0, 240, 255), width=2)
+        d.rectangle([cx - 20, cy - 20, cx + 20, cy + 20], outline=(0, 240, 255), width=1)
+
+        # Thermal Lock-on Bounding Box
+        d.rectangle([135, 55, 215, 105], outline=(0, 255, 150), width=3)
+
+        st.image(flir_img, caption="UAV Recon Eagle-X // Direct Drone Gimbal Telemetry", use_container_width=True)
+
+    with col_telemetry:
+        st.markdown("###### 📊 Real-Time Drone Avionics Telemetry")
         st.markdown("""
-        <div style="background:rgba(13,21,39,0.7); border:1px solid rgba(0,240,255,0.2); padding:12px; border-radius:10px; font-size:12px;">
-            <span style="color:#00f0ff; font-weight:bold;">AUTOMATED VISION EXTRACTION</span><br>
-            • Detected Victims on Elevated Surface: <strong style="color:#10b981;">6 Verified (98.2% Confidence)</strong><br>
-            • Submerged Arterial Depth: <strong style="color:#ef4444;">1.72 meters (Impassable to wheeled vehicles)</strong><br>
-            • Computed Structural Damage Index: <strong style="color:#f59e0b;">86% (Critical Evacuation Mandatory)</strong>
+        <div style="background:rgba(8,16,36,0.8); border:1px solid rgba(0,240,255,0.3); border-radius:10px; padding:16px; font-size:12px; line-height:1.8;">
+            • UAV Unit: <strong style="color:#00f0ff;">Eagle-X Hexacopter Recon</strong><br>
+            • Altitude: <strong>124m AGL (Above Ground Level)</strong><br>
+            • Airspeed: <strong>48.2 km/h (Wind Resistance: Grade 8)</strong><br>
+            • Battery Pack: <strong style="color:#10b981;">88% (Remaining Flight: 34 Mins)</strong><br>
+            • Thermal Sensor: <strong>FLIR Boson 640 @ 60Hz</strong><br>
+            • Target Recognition: <strong style="color:#ef4444;">3 Human Heat Blooms Detected</strong><br>
+            • Payload Status: <strong style="color:#00f0ff;">Acoustic Beacon + 2 Flotation Vests Ready</strong>
         </div>
         """, unsafe_allow_html=True)
 
-    if submit_sos:
-        new_entry = {
-            "id": f"EMERGENCY-0{len(st.session_state.incidents) + 1}",
-            "title": in_name,
-            "type": in_cat,
-            "lat": 12.8050,
-            "lng": 74.8520,
-            "location_name": in_loc,
-            "priority": "CRITICAL P1" if in_trapped >= 4 else "ELEVATED P2",
-            "status": "PENDING",
-            "trapped": in_trapped,
-            "total_victims": in_total,
-            "damage_score": 86,
-            "escalation": "Rapid",
-            "solution_summary": f"Immediate deployment of NDRF Boat Alpha and Paramedic Unit to {in_loc}.",
-            "recommended_units": ["NDRF Inflatable Boat Alpha", "Rapid Paramedic Unit 02"],
-            "eta_mins": 9.8,
-            "safe_corridor": "Coastal Elevated Bypass"
-        }
-        st.session_state.incidents.insert(0, new_entry)
-        play_chime()
-        st.success(f"Disaster Incident Ingested into Live Operational Triage!")
-        time.sleep(1)
-        st.rerun()
+        if st.button("🚀 RELEASE LIFE VEST DROP PAYLOAD", use_container_width=True):
+            trigger_sfx("ping")
+            st.success("Flotation payload winched down safely to rooftop survivors!")
 
 
 # ==============================================================================
-# TAB 3: RESCUE FLEET & OPTIMIZER
+# TAB 3: ENVIRONMENTAL SURGE SIMULATOR
+# ==============================================================================
+with tab_sim:
+    st.markdown("##### 🌊 Dynamic Water Level & Hazard Escalation Simulator")
+    st.caption("Adjust environmental conditions to preview how floodwaters overwhelm road infrastructure and trigger automatic priority escalation.")
+
+    surge_depth = st.slider("Flood Inundation Depth (Meters):", min_value=0.0, max_value=3.5, value=1.8, step=0.1)
+
+    c_sim1, c_sim2 = st.columns(2)
+    with c_sim1:
+        if surge_depth < 0.6:
+            st.success("🟢 Road Condition: ALL MAIN ARTERIAL ROADS PASSABLE\n- Wheeled Ambulances & Fire Trucks Operational.")
+        elif surge_depth < 1.4:
+            st.warning("🟡 Road Condition: PARTIAL SUBMERGENCE\n- High-clearance 4x4 trucks only. Normal vehicles blocked.")
+        else:
+            st.error("🔴 Road Condition: FULL ROAD INUNDATION (> 1.4m)\n- All wheeled vehicles will stall. INFLATABLE RESCUE BOATS MANDATORY.")
+
+    with c_sim2:
+        calc_urgency = round(min(100.0, 45.0 + surge_depth * 16.0), 1)
+        st.metric("Dynamic Urgency Score", f"{calc_urgency} / 100", delta=f"+{surge_depth}m Water Surge", delta_color="inverse")
+
+
+# ==============================================================================
+# TAB 4: FLEET READINESS
 # ==============================================================================
 with tab_fleet:
-    st.markdown("#### 🚒 Emergency Fleet Inventory & Combinatorial Optimizer")
-    st.caption("Matches available emergency equipment to open emergencies minimizing total response arrival latency.")
+    st.markdown("##### 🚒 Rescue Fleet Readiness Inventory")
 
-    if st.button("⚡ EXECUTE FLEET ALLOCATION OPTIMIZER", use_container_width=True):
-        # Assign available units to pending emergencies
-        pending = [i for i in st.session_state.incidents if i["status"] == "PENDING"]
-        avail = [f for f in st.session_state.fleet if f["status"] == "AVAILABLE"]
-        
-        matches = 0
-        for p in pending:
-            for f in avail:
-                if f["status"] == "AVAILABLE":
-                    f["status"] = "EN ROUTE"
-                    f["assigned_to"] = p["id"]
-                    p["status"] = "DISPATCHED"
-                    matches += 1
-                    break
-        play_chime()
-        st.success(f"Optimal Allocation Complete: {matches} emergency units matched and dispatched.")
-        time.sleep(1)
-        st.rerun()
-
-    fleet_table = []
+    f_data = []
     for f in st.session_state.fleet:
-        fleet_table.append({
+        f_data.append({
             "Unit Code": f["id"],
             "Asset Name": f["name"],
             "Category": f["type"],
             "Status": f["status"],
-            "Power/Fuel": f"{f['battery']}%",
-            "Capacity": f"{f['capacity']} Survivors",
-            "Crew Size": f"{f['crew']} Pers",
-            "Assignment": f["assigned_to"] or "READY (STANDBY)"
+            "Crew": f"{f['crew']} Pers",
+            "Extraction Capacity": f"{f['capacity']} Victims",
+            "Battery / Fuel": f"{f['battery']}%"
         })
-
-    st.dataframe(pd.DataFrame(fleet_table), use_container_width=True, hide_index=True)
-
-
-# ==============================================================================
-# TAB 4: SAFE HAZARD CORRIDORS
-# ==============================================================================
-with tab_routes:
-    st.markdown("#### 🛣️ Hazard-Free Routing & Road Clearance Corridors")
-    st.caption("Dynamically steers rescue convoys around flooded underpasses, landslides, and toxic plumes.")
-
-    r1, r2 = st.columns(2)
-    with r1:
-        st.markdown("""
-        <div style="background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3); border-radius:12px; padding:16px;">
-            <div style="font-weight:700; color:#ef4444; font-size:13px; margin-bottom:8px;">⛔ BLOCKED DIRECT ARTERIAL ROUTE (NH-66)</div>
-            <div style="font-size:12px; color:#cbd5e1; line-height:1.6;">
-                • Obstruction: Underpass submerged under 1.8m flash floodwaters.<br>
-                • Risk Assessment: <strong>96% probability of vehicle stall/inundation.</strong><br>
-                • Travel ETA: <strong>BLOCKED (Infinite Latency)</strong><br>
-                • Clearance Decision: <strong>REJECTED BY NAVIGATION ENGINE</strong>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    with r2:
-        st.markdown("""
-        <div style="background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3); border-radius:12px; padding:16px;">
-            <div style="font-weight:700; color:#10b981; font-size:13px; margin-bottom:8px;">✅ AI CALCULATED SAFE CORRIDOR (KAIKAMBA BYPASS)</div>
-            <div style="font-size:12px; color:#cbd5e1; line-height:1.6;">
-                • Alignment: Elevated peripheral bypass with 350m hazard buffer.<br>
-                • Water Inundation: <strong>Zero structural flooding detected.</strong><br>
-                • Travel Distance: <strong>+3.2 km detour</strong><br>
-                • Arrival ETA: <strong>11.4 mins guaranteed arrival time</strong>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+    st.dataframe(pd.DataFrame(f_data), use_container_width=True, hide_index=True)
