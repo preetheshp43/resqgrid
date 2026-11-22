@@ -349,6 +349,11 @@ def render_cinematic_3d_radar():
 # ==============================================================================
 # 4. CRISIS DATA ENGINE
 # ==============================================================================
+SESSION_VERSION = "3.0"
+if st.session_state.get("session_version") != SESSION_VERSION:
+    st.session_state.clear()
+    st.session_state["session_version"] = SESSION_VERSION
+
 if "incidents" not in st.session_state:
     st.session_state.incidents = [
         {
@@ -437,9 +442,9 @@ st.markdown("""
 render_cinematic_3d_radar()
 
 # Live Mission Counters
-open_incidents = [i for i in st.session_state.incidents if i["status"] != "RESOLVED"]
-trapped_lives = sum(i["trapped"] for i in open_incidents)
-units_deployed = len([f for f in st.session_state.fleet if f["status"] in ["EN ROUTE", "ON SCENE"]])
+open_incidents = [i for i in st.session_state.incidents if i.get("status") != "RESOLVED"]
+trapped_lives = sum(i.get("trapped", i.get("trapped_victims", 2)) for i in open_incidents)
+units_deployed = len([f for f in st.session_state.fleet if f.get("status") in ["EN ROUTE", "ON SCENE"]])
 
 m1, m2, m3, m4, m5 = st.columns(5)
 m1.metric("Critical Sectors", f"{len(open_incidents)} Active")
@@ -474,13 +479,16 @@ with tab_ops:
         # PyDeck 3D Layer
         pts = []
         for inc in open_incidents:
+            dmg = inc.get("damage_pct", inc.get("damage_score", 85))
+            tr = inc.get("trapped", inc.get("trapped_victims", 2))
+            is_crit = "CRITICAL" in inc.get("priority", "CRITICAL P1")
             pts.append({
-                "title": inc["title"],
-                "lat": inc["lat"],
-                "lng": inc["lng"],
-                "elevation": inc["damage_pct"] * 35,
-                "color": [239, 68, 68, 220] if "CRITICAL" in inc["priority"] else [245, 158, 11, 220],
-                "radius": inc["trapped"] * 60 + 180
+                "title": inc.get("title", "Emergency Crisis"),
+                "lat": inc.get("lat", 12.85),
+                "lng": inc.get("lng", 74.85),
+                "elevation": dmg * 35,
+                "color": [239, 68, 68, 220] if is_crit else [245, 158, 11, 220],
+                "radius": tr * 60 + 180
             })
 
         view = pdk.ViewState(latitude=12.8950, longitude=74.8500, zoom=11.3, pitch=45, bearing=-10)
@@ -564,7 +572,7 @@ with tab_ops:
         with sc3:
             if st.button("⚡ AUTO-OPTIMIZE ENTIRE FLEET", use_container_width=True):
                 for inc in st.session_state.incidents:
-                    if inc["status"] != "RESOLVED":
+                    if inc.get("status") != "RESOLVED":
                         inc["status"] = "UNITS EN ROUTE"
                 for f in st.session_state.fleet:
                     f["status"] = "EN ROUTE"
@@ -575,22 +583,31 @@ with tab_ops:
         st.markdown("##### 🚨 Active Crisis Queue & One-Click Execution")
 
         for inc in open_incidents:
-            is_dispatched = "EN ROUTE" in inc["status"]
+            is_dispatched = "EN ROUTE" in inc.get("status", "") or "DISPATCHED" in inc.get("status", "")
+            inc_id = inc.get("id", "CRISIS")
+            title = inc.get("title", "Active Crisis")
+            sector = inc.get("sector", inc.get("location_name", inc.get("address", "Sector Hub")))
+            trapped = inc.get("trapped", inc.get("trapped_victims", 2))
+            time_to_crest = inc.get("time_to_crest", "25 Mins")
+            ai_action = inc.get("ai_action", inc.get("solution_summary", "Deploy rescue unit"))
+            status = inc.get("status", "IMMEDIATE DISPATCH REQUIRED")
+            units_needed = inc.get("units_needed", inc.get("recommended_units", []))
+
             st.markdown(f"""
             <div class="crisis-card">
                 <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
-                    <span style="color:#00f0ff; font-weight:bold; font-size:12px;">{inc['id']}</span>
+                    <span style="color:#00f0ff; font-weight:bold; font-size:12px;">{inc_id}</span>
                     <span class="{'status-pill-dispatched' if is_dispatched else 'status-pill-p1'}">
-                        {inc['status']}
+                        {status}
                     </span>
                 </div>
-                <div style="font-size:14px; font-weight:800; color:#fff; margin-bottom:4px;">{inc['title']}</div>
+                <div style="font-size:14px; font-weight:800; color:#fff; margin-bottom:4px;">{title}</div>
                 <div style="font-size:11px; color:#94a3b8; margin-bottom:6px;">
-                    📍 {inc['sector']} • Trapped: <strong style="color:#ef4444;">{inc['trapped']} lives</strong> • Window: <strong style="color:#f59e0b;">{inc['time_to_crest']}</strong>
+                    📍 {sector} • Trapped: <strong style="color:#ef4444;">{trapped} lives</strong> • Window: <strong style="color:#f59e0b;">{time_to_crest}</strong>
                 </div>
                 <div style="background:rgba(6,10,20,0.7); border:1px solid rgba(0,240,255,0.2); padding:8px 12px; border-radius:6px; font-size:11px; margin-bottom:10px;">
                     <strong style="color:#00f0ff;">AI RECOMMENDED MOVE:</strong><br>
-                    {inc['ai_action']}
+                    {ai_action}
                 </div>
             </div>
             """, unsafe_allow_html=True)
@@ -598,18 +615,18 @@ with tab_ops:
             b1, b2 = st.columns([1, 1])
             with b1:
                 if not is_dispatched:
-                    if st.button(f"⚡ AUTHORIZE DISPATCH", key=f"disp_{inc['id']}", use_container_width=True):
+                    if st.button(f"⚡ AUTHORIZE DISPATCH", key=f"disp_{inc_id}", use_container_width=True):
                         inc["status"] = "UNITS EN ROUTE"
-                        for u in inc["units_needed"]:
-                            match = next((f for f in st.session_state.fleet if f["name"] == u), None)
+                        for u in units_needed:
+                            match = next((f for f in st.session_state.fleet if f.get("name") == u), None)
                             if match:
                                 match["status"] = "EN ROUTE"
                         trigger_sfx("dispatch")
                         st.rerun()
             with b2:
-                if st.button(f"✅ CONFIRM RESCUE", key=f"res_{inc['id']}", use_container_width=True):
+                if st.button(f"✅ CONFIRM RESCUE", key=f"res_{inc_id}", use_container_width=True):
                     inc["status"] = "RESOLVED"
-                    st.session_state.survivors_extracted += inc["trapped"]
+                    st.session_state.survivors_extracted += trapped
                     for f in st.session_state.fleet:
                         f["status"] = "AVAILABLE"
                     trigger_sfx("dispatch")
@@ -722,12 +739,12 @@ with tab_fleet:
     f_data = []
     for f in st.session_state.fleet:
         f_data.append({
-            "Unit Code": f["id"],
-            "Asset Name": f["name"],
-            "Category": f["type"],
-            "Status": f["status"],
-            "Crew": f"{f['crew']} Pers",
-            "Extraction Capacity": f"{f['capacity']} Victims",
-            "Battery / Fuel": f"{f['battery']}%"
+            "Unit Code": f.get("id", "UNIT"),
+            "Asset Name": f.get("name", "Rescue Asset"),
+            "Category": f.get("type", "General"),
+            "Status": f.get("status", "AVAILABLE"),
+            "Crew": f"{f.get('crew', 4)} Pers",
+            "Extraction Capacity": f"{f.get('capacity', 4)} Victims",
+            "Battery / Fuel": f"{f.get('battery', 90)}%"
         })
     st.dataframe(pd.DataFrame(f_data), use_container_width=True, hide_index=True)
